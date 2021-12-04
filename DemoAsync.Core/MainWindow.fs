@@ -5,10 +5,12 @@ open Elmish
 open Elmish.WPF
 open ElmishSupport
 
+type ProgressIndicator = Idle | InProgress of percent:int
+
 type Model =
     {
         StatusText: string
-        Progress: int
+        ProgressIndicator: ProgressIndicator
     }
 
 type Msg =
@@ -20,7 +22,7 @@ type Msg =
 let initialModel =
     {
         StatusText = "Hello world!"
-        Progress = 0
+        ProgressIndicator = Idle
     }
 
 let init () = initialModel, Cmd.none
@@ -44,9 +46,12 @@ let update (msg: Msg) (m: Model) : Model * Cmd<Msg> =
     match msg with
     | DoSomeWork event -> doSomeWork event m
     | UpdateStatus (statusText, progress) ->
-        { m with StatusText = statusText; Progress = progress }, Cmd.none
+        { m with StatusText = statusText; ProgressIndicator = InProgress progress }, Cmd.none
     | WorkIsComplete ->
-        { m with StatusText = "Work was completed."; Progress = 0 }, Cmd.none
+        { m with
+            StatusText = "Work was completed."
+            ProgressIndicator = Idle // This will enable the button when work has completed.
+        }, Cmd.none
     | RunWithProgress ->
         let incrementDelayedCmd (dispatch: Msg -> unit) : unit =
             let delayedDispatch = async {
@@ -57,17 +62,27 @@ let update (msg: Msg) (m: Model) : Model * Cmd<Msg> =
                 do! Async.Sleep 1000
                 dispatch (UpdateStatus ("Late work", 90))
                 do! Async.Sleep 1000
+                dispatch (UpdateStatus ("Work complete", 100))
                 dispatch WorkIsComplete
                 }
             Async.StartImmediate delayedDispatch
-        { m with StatusText = "Started progress." }, Cmd.ofSub incrementDelayedCmd
+        { m with
+            StatusText = "Started progress."
+            ProgressIndicator = InProgress 0 // This will disable the button when work starts.
+        }, Cmd.ofSub incrementDelayedCmd
 let bindings () : Binding<Model,Msg> list = [
     "StatusText" |> Binding.oneWay (fun m -> m.StatusText)
     "DoSomeWork" |> Binding.cmd (DoSomeWork (Started ()))
-    "RunWithProgress" |> Binding.cmd RunWithProgress
-    "Progress" |> Binding.oneWay (fun m -> float m.Progress)
+    "RunWithProgress" |> Binding.cmdIf (RunWithProgress,
+        fun m -> match m.ProgressIndicator with Idle -> true | _ -> false)
+    "Progress" |> Binding.oneWay (fun m ->
+        match m.ProgressIndicator with Idle -> 0. | InProgress v -> float v)
     ]
 
-let designTimeModel = { StatusText = "This is design time."; Progress = 30 }
+let designTimeModel =
+    {
+        StatusText = "This is design time."
+        ProgressIndicator = InProgress 30
+    }
 
 let designVm = ViewModel.designInstance designTimeModel (bindings ())
