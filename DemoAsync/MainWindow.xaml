@@ -10,8 +10,9 @@
         Title="ListBox demo" Height="300" Width="500"
         WindowStartupLocation="CenterScreen">
     <StackPanel>
-        <TextBlock Text="{Binding StatusText}"/>
         <Button Content="Do some work" Command="{Binding DoSomeWork}"/>
         <Button Content="Run with progress" Command="{Binding RunWithProgress}"/>
+        <TextBlock Text="{Binding StatusText}" TextAlignment="Center"/>
+        <ProgressBar Value="{Binding Progress}" Minimum="1" Maximum="100" Height="40"/>
     </StackPanel>
 </Window>
