@@ -14,10 +14,11 @@ type Model =
     }
 
 type Msg =
-    | DoSomeWork of Aos<Result<int,string>>
+    | DoSomeWork of Aos<unit,Result<int,string>,exn>
     | RunWithProgress
     | UpdateStatus of statusText:string * progress:int
     | WorkIsComplete // This message could carry a result from the work done.
+let msgDoSomeWork i = DoSomeWork (StartAsync ())
 
 let initialModel =
     {
@@ -28,19 +29,22 @@ let initialModel =
 let init () = initialModel, Cmd.none
 
 let someWork () : Async<Result<int,string>> = async {
+    failwith "This is an exception."
     do! Async.Sleep 3000
     return Result.Ok 7
     }
 
 let private doSomeWork event (m: Model) =
     match event with
-    | Started () ->
+    | StartAsync () ->
         { m with StatusText = "Starting." },
-            Cmd.OfAsync.result (someWork () |> Async.map (Finished >> DoSomeWork))
-    | Finished (Result.Ok value) ->
+            Cmd.OfAsync.either someWork () (FinishAsync >> DoSomeWork) (FailAsync >> DoSomeWork)
+    | FinishAsync (Result.Ok value) ->
         { m with StatusText = $"Done, got {value}" }, Cmd.none
-    | Finished (Result.Error error) ->
+    | FinishAsync (Result.Error error) ->
         { m with StatusText = $"Done, but with error {error}" }, Cmd.none
+    | FailAsync (ex: exn) ->
+        { m with StatusText = $"Done, but with exception message {ex.Message}" }, Cmd.none
 
 let update (msg: Msg) (m: Model) : Model * Cmd<Msg> =
     match msg with
@@ -72,7 +76,7 @@ let update (msg: Msg) (m: Model) : Model * Cmd<Msg> =
         }, Cmd.ofSub incrementDelayedCmd
 let bindings () : Binding<Model,Msg> list = [
     "StatusText" |> Binding.oneWay (fun m -> m.StatusText)
-    "DoSomeWork" |> Binding.cmd (DoSomeWork (Started ()))
+    "DoSomeWork" |> Binding.cmd msgDoSomeWork
     "RunWithProgress" |> Binding.cmdIf (RunWithProgress,
         fun m -> match m.ProgressIndicator with Idle -> true | _ -> false)
     "Progress" |> Binding.oneWay (fun m ->

@@ -4,16 +4,18 @@ module Async =
 
     let map f computation = async.Bind(computation, f >> async.Return)
 
-// The Deferred stuff from
+// The Deferred type and a modified AsyncOperationStatus type from
 // https://zaid-ajaj.github.io/the-elmish-book
-// Modified to also support a start parameter,
-// for cases when input data is not found in the model.
+// AsyncOperationStatus is modified to support a start parameter,
+// for cases when input data is not found in the model. It also
+// has a FinishAsync case that often handles the Result type,
+// and a FailAsync case that usually handles the exception from
+// Cmd.Async.either
 
-type AsyncOperationStatusWithParameter<'a,'r> = Started of 'a | Finished of 'r
-type AosParam<'a,'r> = AsyncOperationStatusWithParameter<'a,'r> // Abbreviation
-
-type AsyncOperationStatus<'r> = AsyncOperationStatusWithParameter<unit,'r>
-type Aos<'r> = AsyncOperationStatus<'r> // Abbreviation
+type Aos<'argument,'result,'error> = // short for AsyncOperationStatus
+    | StartAsync of 'argument
+    | FinishAsync of 'result
+    | FailAsync of 'error
 
 type Deferred<'t> =
     | HasNotStartedYet
